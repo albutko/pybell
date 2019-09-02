@@ -1,16 +1,17 @@
-import glob
+import pickle
 
 import numpy as np
 import cv2
 
+
 from .exceptions import ImageLoadException, ChessboardCornerException
+from image import cvt_to_gray
 
-
-def get_calibration_coefficients(image_folder, board_size = (7,7)):
+def calculate_calibration_coefficients(images, board_size = (7,7)):
     """ Kind distortion coefficients K, D for fisheye camera model
 
         Args:
-            image_path (str): Path to calibration chessboard image
+            images (List): List of images with Chessboard Calibration pattern
             board_size (tuple): Chessboard Size
 
         Returns:
@@ -22,15 +23,10 @@ def get_calibration_coefficients(image_folder, board_size = (7,7)):
     subpix_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
     # Read in image input
 
-    img_paths = glob.glob(image_folder+'/*')
-
     imgPoints = list()
-    for path in img_paths:
-        img = cv2.imread(path)
-        if img is None:
-            raise ImageLoadException()
+    for img in images:
 
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = cvt_to_gray(img)
 
         # Find Chessboard Corners
         retval, corners = cv2.findChessboardCorners(img, board_size)
@@ -55,3 +51,48 @@ def get_calibration_coefficients(image_folder, board_size = (7,7)):
     cv2.fisheye.calibrate(objPoints, corners, img.shape, K, D)
 
     return (K, D)
+
+
+def save_calibration_coefficients(K, D, file_path):
+    """ Save calibration matrix, K, and distortion coefficients, D, to file as a dict
+        {
+            K: np.array,
+            D: np.array
+        }
+
+        Args:
+            K (3x3 np.ndarray): Calibration camera matrix
+            D (4x1 np.ndarray): distortion coefficients
+            file_path (str): path to output file
+    """
+    calib_dict = {'K': K, 'D': D}
+
+    with open(filename, 'wb') as f:
+        pickle.dump(calib_dict, f)
+
+
+def load_calibration_coefficients(file_path):
+    """ Load calibration matrix, K, and distortion coefficients, D, from file as dict
+
+        Args:
+            file_path (str): path to calib file
+
+        Returns:
+            calib (dict): Dictionary of necessary calibation coefficients
+                {
+                    K: np.array,
+                    D: np.array
+                }
+    """
+    with open(file_path, 'rb') as f:
+        calib = pickle.load(f)
+
+    # Assertions - Contains needed calibration variables
+    assert 'K' in calib, f'Calibration matrix not stored in {file_path}'
+    assert 'D' in calib, f'Distorition coefficients not stored in {file_path}'
+
+    # Variables are the correct shape
+    assert calib.get('K').shape == (3, 3), f'Calibration Matrix is wrong shape {calib.get('K').shape} != (3,3)'
+    assert calib.get('D').shape == (1, 4), f'Distortion coefficients is wrong shape {calib.get('D').shape} != (1,4)'
+
+    return calib
