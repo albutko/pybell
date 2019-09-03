@@ -43,7 +43,6 @@ class FaceDetector:
         return (faceCount, bboxes, faces)
 
 
-
 def draw_detections(img, bboxes):
     """
         Display image and detected face bounding boxes in a new window
